@@ -430,18 +430,18 @@ if $sODisksInfo;then
 		#如果硬盘不存在就输出空JSON
 
 		cat >> $contentfornp << EOF
-			\$res->{sd$sdi} = \`
-				if [ -b $sd ];then
-					if $hddisk && hdparm -C $sd | grep -iq 'standby';then
-						echo '{"standy": true}'
-					else
-						smartctl $sd -a -j
-					fi
-				else
-					echo '{}'
-				fi
-			\`;
-		EOF
+	\$res->{sd$sdi} = \`
+		if [ -b $sd ];then
+			if $hddisk && hdparm -C $sd | grep -iq 'standby';then
+				echo '{"standy": true}'
+			else
+				smartctl $sd -a -j
+			fi
+		else
+			echo '{}'
+		fi
+	\`;
+EOF
 
 		cat >> $contentforpvejs << EOF
 		{
