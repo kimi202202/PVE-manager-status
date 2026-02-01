@@ -288,7 +288,7 @@ cat > $contentforpvejs << 'EOF'
 
 		// 逻辑判断：如果市电正常且电量不满，标记为充电中
 		if (statusRaw === 'ONLINE' && chargeVal < 100) {
-			status += ' (充电中)';
+			status += chargeVal;
 		} else if (statusRaw === 'CHARGING') {
 			status = '充电中';
 		}
