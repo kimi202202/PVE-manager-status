@@ -296,10 +296,10 @@ cat > $contentforpvejs << 'EOF'
 		}
 
 		// 5. 格式化单位
-		let charge  = chargeRaw ? chargeRaw.replace(/Percent/i, '%') : '';
-		if (load)    load    = load.replace(/Percent/i, '%');
-		if (runtime) runtime = runtime.replace(/Minutes/i, 'min');
-		if (battv)   battv   = battv.replace(/Volts?/i, 'V');
+		let charge  = chargeRaw ? chargeRaw.replace(/ Percent/i, '%') : '';
+		if (load)    load    = load.replace(/ Percent/i, '%');
+		if (runtime) runtime = runtime.replace(/ Minutes/i, 'min');
+		if (battv)   battv   = battv.replace(/ Volts?/i, 'V');
 
 		// 6. 组装显示数组
 		let s = [];
