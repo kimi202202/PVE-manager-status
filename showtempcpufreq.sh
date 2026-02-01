@@ -252,7 +252,7 @@ cat > $contentforpvejs << 'EOF'
 		
 		renderer: function (v) {
 		if (!v || v.indexOf('NO_APCACCESS') !== -1) {
-        return '未检测到 UPS';
+			return '未检测到 UPS';
 		}
 
 		let get = (k) => {
@@ -260,60 +260,54 @@ cat > $contentforpvejs << 'EOF'
 			return m ? m[1].trim() : '';
 		};
 
-		// 从合并后的字符串中提取连接信息
-		let connRaw = get('UPS_CONN');
+		// 1. 获取基础数据
+		let statusRaw = get('STATUS');
+		let chargeRaw = get('BCHARGE');
+		let load      = get('LOADPCT');
+		let runtime   = get('TIMELEFT');
+		let battv     = get('BATTV');
+		let model     = get('MODEL');
+		let connRaw   = get('UPS_CONN');
+		let chargeVal = parseFloat(chargeRaw); 
+
+		// 2. 处理连接方式
 		let conn = '未知';
 		if (/^net:/i.test(connRaw)) {
-			let ip = connRaw.replace(/^net:/i, '');
-			conn = '网络 (' + ip + ')';
+			conn = '网络 (' + connRaw.replace(/^net:/i, '') + ')';
 		} else if (/^local:/i.test(connRaw)) {
-			let type = connRaw.replace(/^local:/i, '');
-			conn = '直连 (' + type + ')';
+			conn = '直连 (' + connRaw.replace(/^local:/i, '') + ')';
 		}
-	
-		// ===== 状态映射 =====
+
+		// 3. 处理状态映射
 		let statusMap = {
 			'ONLINE': '市电',
-			'ONBATT': '电池',
+			'ONBATT': '电池供电',
 			'LOWBATT': '电量低',
 			'CHARGING': '充电中'
 		};
-	
-		// 在你的 pvemanagerlib.js renderer 函数中修改状态映射部分
-		let statusRaw = get('STATUS');
-		let charge = get('BCHARGE'); 
-		let chargeVal = parseFloat(charge); // 提取数字部分
-
 		let status = statusMap[statusRaw] || statusRaw || '未知';
 
-		// 逻辑判断：如果市电正常且电量不满，标记为充电中
+		// 4. 充电逻辑增强判断
 		if (statusRaw === 'ONLINE' && chargeVal < 100) {
 			status += ' (充电中)';
-		} else if (statusRaw === 'CHARGING') {
-			status = '充电中';
 		}
-	
-		let charge  = get('BCHARGE');
-		let load    = get('LOADPCT');
-		let runtime = get('TIMELEFT');
-		let battv   = get('BATTV');
-		let model   = get('MODEL');
-	
-		// 单位格式化
-		if (charge)  charge  = charge.replace(/Percent/i, '%');
+
+		// 5. 格式化单位
+		let charge  = chargeRaw ? chargeRaw.replace(/Percent/i, '%') : '';
 		if (load)    load    = load.replace(/Percent/i, '%');
 		if (runtime) runtime = runtime.replace(/Minutes/i, '分');
 		if (battv)   battv   = battv.replace(/Volts?/i, 'V');
-	
+
+		// 6. 组装显示数组
 		let s = [];
-		s.push('UPS 状态: ' + status);
+		s.push('状态: ' + status);
 		s.push('连接: ' + conn);		
 		if (charge)  s.push('电量: ' + charge);
-		if (battv)   s.push('电池: ' + battv);
+		if (battv)   s.push('电压: ' + battv);
 		if (load)    s.push('负载: ' + load);
 		if (runtime) s.push('剩余: ' + runtime);
 		if (model)   s.push('型号: ' + model);
-	
+
 		return s.join(' | ');
 	}
 	},
