@@ -253,19 +253,19 @@ cat > $contentforpvejs << 'EOF'
 		printBar: false,
 		title: gettext('UPS'),
 		textField: 'ups',
-		renderer: function (v) {
+		renderer: function (v, meta, record) {
 		if (!v || v.indexOf('NO_APCACCESS') !== -1) {
 			return '未检测到 UPS';
 		}
-
+	
 		let get = (k) => {
 			let m = v.match(new RegExp('^' + k + '\\s*:\\s*(.+)$', 'mi'));
 			return m ? m[1].trim() : '';
 		};
-		
-		// ups连接状态 网络或USB
-		let connRaw = record.upsconn || '';
-
+	
+		// ===== UPS 连接方式（来自 Nodes.pm 的 upsconn）=====
+		let connRaw = record?.upsconn || '';
+	
 		let conn = '未知';
 		if (/^net:/i.test(connRaw)) {
 			let ip = connRaw.replace(/^net:/i, '');
@@ -273,30 +273,30 @@ cat > $contentforpvejs << 'EOF'
 		} else if (/^local:/i.test(connRaw)) {
 			conn = '直连';
 		}
-
-		// 状态映射
+	
+		// ===== 状态映射 =====
 		let statusMap = {
 			'ONLINE': '市电',
 			'ONBATT': '电池',
 			'LOWBATT': '电量低',
 			'CHARGING': '充电中'
 		};
-
+	
 		let statusRaw = get('STATUS');
 		let status = statusMap[statusRaw] || statusRaw || '未知';
-
-		let charge  = get('BCHARGE');   // 82.0 Percent
-		let load    = get('LOADPCT');   // 12.0 Percent
-		let runtime = get('TIMELEFT');  // 21.2 Minutes
-		let battv   = get('BATTV');     // 13.1 Volts
+	
+		let charge  = get('BCHARGE');
+		let load    = get('LOADPCT');
+		let runtime = get('TIMELEFT');
+		let battv   = get('BATTV');
 		let model   = get('MODEL');
-
-		// 格式化
+	
+		// 单位格式化
 		if (charge)  charge  = charge.replace(/Percent/i, '%');
 		if (load)    load    = load.replace(/Percent/i, '%');
 		if (runtime) runtime = runtime.replace(/Minutes/i, '分');
 		if (battv)   battv   = battv.replace(/Volts?/i, 'V');
-
+	
 		let s = [];
 		s.push('UPS 状态: ' + status);
 		s.push('连接: ' + conn);
@@ -305,9 +305,9 @@ cat > $contentforpvejs << 'EOF'
 		if (load)    s.push('负载: ' + load);
 		if (runtime) s.push('剩余: ' + runtime);
 		if (model)   s.push('型号: ' + model);
-		
+	
 		return s.join(' | ');
-		}
+	}
 	},
 EOF
 
