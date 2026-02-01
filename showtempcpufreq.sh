@@ -465,9 +465,9 @@ EOF
 						return '找不到硬盘，直通或已被卸载';
 					}
 					//序列号
-					let snRaw1 = v.serial_number;
+					let snRaw = v.serial_number;
 					// 如果存在则返回带前缀的字符串，否则返回空字符串
-					let sn1 = snRaw1 ? " | SN: "+ snRaw1 : '111';
+					let sn = snRaw1 ? " | SN: "+ snRaw : '';
 					
 					// 温度
 					let temp = v.temperature?.current;
@@ -488,7 +488,7 @@ EOF
 					}
 					
 					
-					let t = model + sn1 + temp + pot + smart;
+					let t = model + sn + temp + pot + smart;
 					//console.log(t);
 					return t;
 				}catch(e){
