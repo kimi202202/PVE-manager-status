@@ -262,6 +262,18 @@ cat > $contentforpvejs << 'EOF'
 		let battv   = get('BATTV');     // 13.1 Volts
 		let model   = get('MODEL');
 
+		// === 连接方式识别 ===
+		let upsmode = get('UPSMODE');           // standalone / net
+		let master  = get('MASTERUPSD');        // ip:port
+	
+		let conn = '未知';
+		if (/net/i.test(upsmode)) {
+			let ip = master ? master.split(':')[0] : '未知IP';
+			conn = `网络 (${ip})`;
+		} else if (/standalone/i.test(upsmode)) {
+			conn = '直连';
+		}
+
 		// 格式化
 		if (charge)  charge  = charge.replace(/Percent/i, '%');
 		if (load)    load    = load.replace(/Percent/i, '%');
@@ -270,6 +282,8 @@ cat > $contentforpvejs << 'EOF'
 
 		let s = [];
 		s.push('UPS 状态: ' + status);
+		s.push('连接: ' + c
+		
 		if (charge)  s.push('电量: ' + charge);
 		if (battv)   s.push('电池: ' + battv);
 		if (load)    s.push('负载: ' + load);
