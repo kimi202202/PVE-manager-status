@@ -343,7 +343,9 @@ EOF
 						return '找不到硬盘，直通或已被卸载';
 					}
 					//序列号
-					let sn = v.serial_number || '无序列号'; // 提取序列号
+					let snRaw = v.serial_number;
+					// 如果存在则返回带前缀的字符串，否则返回空字符串
+					let sn = snRaw ? ` | SN: ${snRaw}` : '';
 					// 温度
 					let temp = v.temperature?.current;
 					temp = ( temp !== undefined ) ? " | " + temp + '°C' : '' ;
