@@ -430,18 +430,18 @@ if $sODisksInfo;then
 		#如果硬盘不存在就输出空JSON
 
 		cat >> $contentfornp << EOF
-	\$res->{sd$sdi} = \`
-		if [ -b $sd ];then
-			if $hddisk && hdparm -C $sd | grep -iq 'standby';then
-				echo '{"standy": true}'
-			else
-				smartctl $sd -a -j
-			fi
-		else
-			echo '{}'
-		fi
-	\`;
-EOF
+			\$res->{sd$sdi} = \`
+				if [ -b $sd ];then
+					if $hddisk && hdparm -C $sd | grep -iq 'standby';then
+						echo '{"standy": true}'
+					else
+						smartctl $sd -a -j
+					fi
+				else
+					echo '{}'
+				fi
+			\`;
+		EOF
 
 		cat >> $contentforpvejs << EOF
 		{
@@ -467,7 +467,8 @@ EOF
 					//序列号
 					let snRaw = v.serial_number;
 					// 如果存在则返回带前缀的字符串，否则返回空字符串
-					let sn = snRaw ? " | SN: "+ snRaw : '111';					
+					let sn = snRaw ? " | SN: "+ snRaw : '111';
+					
 					// 温度
 					let temp = v.temperature?.current;
 					temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
