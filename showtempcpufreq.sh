@@ -299,8 +299,7 @@ cat > $contentforpvejs << 'EOF'
 	
 		let s = [];
 		s.push('UPS 状态: ' + status);
-		s.push('连接: ' + conn);
-		s.push('connRaw: ' + connRaw);
+		s.push('连接: ' + conn);		
 		if (charge)  s.push('电量: ' + charge);
 		if (battv)   s.push('电池: ' + battv);
 		if (load)    s.push('负载: ' + load);
