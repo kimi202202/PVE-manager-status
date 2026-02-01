@@ -467,7 +467,7 @@ EOF
 					//序列号
 					let snRaw = v.serial_number;
 					// 如果存在则返回带前缀的字符串，否则返回空字符串
-					let sn = snRaw ? " | SN: "+ snRaw : 'ddd';	
+					let sn = " | SN:111 ";	
 					// 温度
 					let temp = v.temperature?.current;
 					temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
