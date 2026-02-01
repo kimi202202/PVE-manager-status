@@ -125,6 +125,7 @@ $res->{cpuFreq} = `
 	[ -e /usr/sbin/turbostat ] && turbostat --quiet --cpu package --show "PkgWatt" -S sleep 0.25 2>&1 | tail -n1 
 
 `;
+# 修改此处：将连接信息整合进 ups 变量
 $res->{ups} = `
 	# 获取连接方式
 	if [ -f /etc/apcupsd/apcupsd.conf ]; then
@@ -142,7 +143,6 @@ $res->{ups} = `
 	fi
 `;
 EOF
-
 
 
 contentforpvejs=/tmp/.contentforpvejs.tmp
