@@ -125,18 +125,23 @@ $res->{cpuFreq} = `
 	[ -e /usr/sbin/turbostat ] && turbostat --quiet --cpu package --show "PkgWatt" -S sleep 0.25 2>&1 | tail -n1 
 
 `;
-# 修改此处：将连接信息整合进 ups 变量
+# 修改后的 contentfornp UPS 部分
 $res->{ups} = `
-	# 获取连接方式
 	if [ -f /etc/apcupsd/apcupsd.conf ]; then
-		conn=$(awk '/^UPSTYPE/ { t=$2 } /^DEVICE/  { d=$2 } END { if (t == "net" && d != "") print "net:" d; else if (t != "") print "local:" t; else print "unknown"; }' /etc/apcupsd/apcupsd.conf)
+		# 注意：在 cat << 'EOF' 环境下，内部的 $ 符号如果想让 shell 执行，需要保持原样
+		# 但为了防止 Perl 误判，我们确保逻辑简单
+		_TYPE=\$(awk '/^UPSTYPE/ {print \$2}' /etc/apcupsd/apcupsd.conf)
+		_DEV=\$(awk '/^DEVICE/ {print \$2}' /etc/apcupsd/apcupsd.conf)
+		if [ "\$_TYPE" = "net" ]; then
+			echo "UPS_CONN : net:\$_DEV"
+		else
+			echo "UPS_CONN : local:\$_TYPE"
+		fi
 	else
-		conn="unknown"
+		echo "UPS_CONN : unknown"
 	fi
 
 	if command -v apcaccess >/dev/null 2>&1; then
-		# 在 apcaccess 输出前注入一行自定义的连接信息
-		echo "UPS_CONN : $conn"
 		apcaccess status 2>/dev/null
 	else
 		echo "NO_APCACCESS"
