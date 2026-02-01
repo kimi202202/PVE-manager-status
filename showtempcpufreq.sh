@@ -342,6 +342,8 @@ EOF
 					if (! model) {
 						return '找不到硬盘，直通或已被卸载';
 					}
+					//序列号
+					let sn = v.serial_number || '无序列号'; // 提取序列号
 					// 温度
 					let temp = v.temperature?.current;
 					temp = ( temp !== undefined ) ? " | " + temp + '°C' : '' ;
@@ -383,7 +385,7 @@ EOF
 					}
 					
 					
-					let t = model  + temp + health + pot + rw + smart;
+					let t = model + sn + temp + health + pot + rw + smart;
 					//console.log(t);
 					return t;
 				}catch(e){
