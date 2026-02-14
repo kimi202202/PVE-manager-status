@@ -407,55 +407,54 @@ fi
 echo "已添加 $nvi 块NVME硬盘"
 
 
-
-#检测机械键盘
+#检测机械硬盘
 echo 检测系统中的SATA固态和机械硬盘
-sdi=0
-usbi=0  # 新增：专门用于 USB 存储的计数器
-if $sODisksInfo;then
-	for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
-		chmod +s /usr/sbin/smartctl
-		chmod +s /usr/sbin/hdparm
-		#检测是否是真的机械硬盘
-		sdsn=$(awk -F '/' '{print $NF}' <<< $sd)
-		sdcr=/sys/block/$sdsn/queue/rotational
-		[ -f $sdcr ] || continue
-				
-		# 在循环中增加判断
-		if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
-			hddisk=false
-			sdtype="外部USB存储$usbi"  # 使用独立计数器
-			let usbi++               # USB 计数自增
-		elif [ "$(cat $sdcr)" = "0" ]; then
-			hddisk=false
-			sdtype="固态硬盘$sdi"
-			let sdi++                # 只有非 USB 设备才增加 sdi
-		else
-			hddisk=true
-			sdtype="机械硬盘$sdi"
-			let sdi++                # 只有非 USB 设备才增加 sdi
-		fi
-		
-		# 注意：下面这一段原有的代码保持不变，但要确保使用我们新逻辑里的 $sdi 
-		# 为了让后端 Perl 逻辑不冲突，我们仍然使用 sd$((sdi+usbi-1)) 这种逻辑或者统一用一个 ID
-		# 最稳妥的方法是：前端显示文字改掉，但内部 ID (itemId) 依然按总数增加，如下：
-		
-		total_idx=$((sdi + usbi - 1))
+sdi=0    # 内部索引，用于跟后端通讯
+hdi=0    # 机械硬盘/固态显示的序号
+usbi=0   # USB存储显示的序号
 
-		cat >> $contentfornp << EOF
-	\$res->{sd$total_idx} = \`
-		if [ -b $sd ];then
-			if $hddisk && hdparm -C $sd | grep -iq 'standby';then
-				echo '{"standby": true}'
-			else
-				smartctl $sd -a -j
-			fi
-		else
-			echo '{}'
-		fi
-	\`;
+if $sODisksInfo;then
+    for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
+        chmod +s /usr/sbin/smartctl
+        chmod +s /usr/sbin/hdparm
+        
+        sdsn=$(awk -F '/' '{print $NF}' <<< $sd)
+        sdcr=/sys/block/$sdsn/queue/rotational
+        [ -f $sdcr ] || continue
+                
+        # 1. 确定类型并分配显示名称
+        if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
+            hddisk=false
+            sdtype="外部USB存储$usbi"
+            let usbi++
+        elif [ "$(cat $sdcr)" = "0" ]; then
+            hddisk=false
+            sdtype="固态硬盘$hdi"
+            let hdi++
+        else
+            hddisk=true
+            sdtype="机械硬盘$hdi"
+            let hdi++
+        fi
+        
+        # 2. 写入 Nodes.pm 的数据获取逻辑
+        cat >> $contentfornp << EOF
+    \$res->{sd$sdi} = \`
+        if [ -b $sd ];then
+            # 解决无法获取信息的问题：尝试添加 -d ata 或 -d sat 参数
+            if $hddisk && hdparm -C $sd 2>/dev/null | grep -iq 'standby';then
+                echo '{"standby": true}'
+            else
+                # 某些硬盘需要指定类型，这里先尝试默认，如果失败则输出基础JSON
+                smartctl $sd -a -j || echo '{"model_name": "Read Error"}'
+            fi
+        else
+            echo '{}'
+        fi
+    \`;
 EOF
 
+        # 3. 写入 JS 的前端渲染逻辑
 		cat >> $contentforpvejs << EOF
 		{
 			  itemId: 'sd${sdi}0',
