@@ -63,22 +63,24 @@ fail() {
 case $1 in 
 	restore)
 		restore
-		echo 已还原修改
-		
+		echo 已还原修改		
 		if [ "$2" != 'remod' ];then 
 			echo -e "请刷新浏览器缓存：\033[31mShift+F5\033[0m"
 			systemctl restart pveproxy
 		else 
 			echo -----
-		fi
-		
+		fi		
 		exit 0
 	;;
-	remod)
-		echo 强制重新修改
-		echo -----------
+	remod|refresh)
+		echo "正在重新扫描硬件并刷新配置..."
+		echo "-----------"
+		# 执行还原但不重启服务
 		"$sap" restore remod > /dev/null 
+		# 重新运行脚本进行扫描修改
 		"$sap"
+		echo -e "\033[32m刷新完成！\033[0m"
+		echo -e "请刷新浏览器缓存：\033[31mShift+F5\033[0m"
 		exit 0
 	;;
 esac
