@@ -408,12 +408,15 @@ EOF
 fi
 echo "已添加 $nvi 块NVME硬盘"
 
-
 #检测机械硬盘
 echo 检测系统中的SATA固态和机械硬盘
 sdi=0    # 内部索引，用于跟后端通讯
-hdi=0    # 机械硬盘/固态显示的序号
+hdi=0    # SATA硬盘显示的序号
 usbi=0   # USB存储显示的序号
+
+# 临时存储生成的 JS 代码块，以便排序
+js_sata_blocks=""
+js_usb_blocks=""
 
 if $sODisksInfo;then
     for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
@@ -428,26 +431,27 @@ if $sODisksInfo;then
         if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
             hddisk=false
             sdtype="外部USB存储$usbi"
+            is_usb=true
             let usbi++
         elif [ "$(cat $sdcr)" = "0" ]; then
             hddisk=false
-            sdtype="固态硬盘$hdi"
+            sdtype="SATA硬盘${hdi}(SSD)"
+            is_usb=false
             let hdi++
         else
             hddisk=true
-            sdtype="机械硬盘$hdi"
+            sdtype="SATA硬盘${hdi}(HDD)"
+            is_usb=false
             let hdi++
         fi
         
-        # 2. 写入 Nodes.pm 的数据获取逻辑
+        # 2. 写入 Nodes.pm 的数据获取逻辑 (保持顺序)
         cat >> $contentfornp << EOF
     \$res->{sd$sdi} = \`
         if [ -b $sd ];then
-            # 解决无法获取信息的问题：尝试添加 -d ata 或 -d sat 参数
             if $hddisk && hdparm -C $sd 2>/dev/null | grep -iq 'standby';then
                 echo '{"standby": true}'
             else
-                # 某些硬盘需要指定类型，这里先尝试默认，如果失败则输出基础JSON
                 smartctl $sd -a -j || echo '{"model_name": "Read Error"}'
             fi
         else
@@ -456,72 +460,52 @@ if $sODisksInfo;then
     \`;
 EOF
 
-        # 3. 写入 JS 的前端渲染逻辑
-		cat >> $contentforpvejs << EOF
-		{
-			  itemId: 'sd${sdi}0',
-			  colspan: 2,
-			  printBar: false,
-			  title: gettext('${sdtype}'),
-			  textField: 'sd${sdi}',
-			  renderer:function(value){
-				//return value;
-				try{
-					let  v = JSON.parse(value);
-					console.log(v)
-					
-					// 如果 v.standby 是 true，但没有 model_name（读卡器报错拿不到型号）
-					// 那么我们就返回 null，让这一行彻底不显示
-					if (v.standby === true && !v.model_name) {
-						return null; 
-					}
-					// 正常的休眠显示（针对有型号的真实硬盘）
-					if (v.standby === true) {
-						return '休眠中';
-					}
-					
-					//名字
-					let model = v.model_name;
-					if (! model) {
-						return '找不到硬盘，直通或已被卸载';
-					}
-					//序列号
-					let snRaw = v.serial_number;
-					// 如果存在则返回带前缀的字符串，否则返回空字符串
-					let sn = snRaw ? " | SN: "+ snRaw : '';
-					
-					// 温度
-					let temp = v.temperature?.current;
-					temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
-					
-					// 通电时间
-					let pot = v.power_on_time?.hours;
-					let poth = v.power_cycle_count;
-					
-					pot = ( pot !== undefined ) ? (" | 通电: " + pot + '时' + ( poth ? ',次: '+ poth : '' )) : '';
-					
-					// smart状态
-					let smart = v.smart_status?.passed;
-					if (smart === undefined ) {
-						smart = '';
-					} else {
-						smart = ' | SMART: ' + (smart ? '正常' : '警告!');
-					}
-					
-					
-					let t = model + sn + temp + pot + smart;
-					//console.log(t);
-					return t;
-				}catch(e){
-					return '无法获得有效消息';
-				};
-			 }
-		},
+        # 3. 构造 JS 渲染逻辑块
+        current_js_block=$(cat << EOF
+        {
+              itemId: 'sd${sdi}0',
+              colspan: 2,
+              printBar: false,
+              title: gettext('${sdtype}'),
+              textField: 'sd${sdi}',
+              renderer:function(value){
+                try{
+                    let v = JSON.parse(value);
+                    if (v.standby === true && !v.model_name) return null; 
+                    if (v.standby === true) return '休眠中';
+                    let model = v.model_name;
+                    if (!model) return '找不到硬盘，直通或已被卸载';
+                    let snRaw = v.serial_number;
+                    let sn = snRaw ? " | SN: "+ snRaw : '';
+                    let temp = v.temperature?.current;
+                    temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
+                    let pot = v.power_on_time?.hours;
+                    let poth = v.power_cycle_count;
+                    pot = ( pot !== undefined ) ? (" | 通电: " + pot + '时' + ( poth ? ',次: '+ poth : '' )) : '';
+                    let smart = v.smart_status?.passed;
+                    smart = (smart === undefined ) ? '' : ' | SMART: ' + (smart ? '正常' : '警告!');
+                    return model + sn + temp + pot + smart;
+                }catch(e){ return '无法获得有效消息'; };
+             }
+        },
 EOF
-		let sdi++
-	done
+)
+        # 根据类型归类
+        if [ "$is_usb" = true ]; then
+            js_usb_blocks+="$current_js_block"
+        else
+            js_sata_blocks+="$current_js_block"
+        fi
+        let sdi++
+    done
 fi
-echo "已添加 $sdi 块SATA固态和机械硬盘"
+
+# 按照 SATA -> USB 的顺序写入文件
+echo "$js_sata_blocks" >> $contentforpvejs
+echo "$js_usb_blocks" >> $contentforpvejs
+
+echo "已添加 $sdi 块硬盘 (SATA: $hdi, USB: $usbi)"
+
 
 echo 开始修改nodes.pm文件
 if ! grep -q 'modbyshowtempfreq' $np ;then
