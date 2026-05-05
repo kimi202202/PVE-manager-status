@@ -529,12 +529,7 @@ fi
 echo 开始修改pvemanagerlib.js文件
 if ! grep -q 'modbyshowtempfreq' $pvejs ;then
 	[ ! -e $pvejs.$pvever.bak ]  && cp $pvejs $pvejs.$pvever.bak
-	
-	# 修复 CPU(s) 的 “1 套接字” 显示为 “1插槽”
-	sed -i -E "
-	s/\(([0-9]+) 套接字\)/(\1插槽)/g
-	" $pvejs
-	
+			
 	if [ "$(sed -n '/pveversion/,+3{
 			/},/{=;p;q}
 		}' $pvejs)" ];then 
@@ -621,6 +616,18 @@ fi
 echo 温度，频率，硬盘信息相关修改已完成
 echo ------------------------
 echo ------------------------
+echo 修复 PVE9 中文“套接字”显示
+# PVE9 中文语言包
+langjs=/usr/share/javascript/proxmox-widget-toolkit/locale/zh_CN.js
+
+if [ -f "$langjs" ]; then
+	[ ! -e $langjs.$pvever.bak ] && cp $langjs $langjs.$pvever.bak
+
+	# 套接字 -> 插槽
+	sed -i 's/套接字/插槽/g' $langjs
+
+	echo 已修复中文语言包
+fi
 echo 开始修改proxmoxlib.js文件
 echo 去除订阅弹窗
 
