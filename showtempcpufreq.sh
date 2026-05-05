@@ -633,20 +633,15 @@ echo 去除订阅弹窗
 if ! grep -q 'modbyshowtempfreq' $plibjs ;then
 
 	[ ! -e $plibjs.$pvever.bak ] && cp $plibjs $plibjs.$pvever.bak
-	
-	if [ "$(sed -n '/\/nodes\/localhost\/subscription/{=;p;q}' $plibjs)" ];then 
-		sed -i '/\/nodes\/localhost\/subscription/,+10{
-			/res === null/{
-				N
-				s/(.*)/(false)/
-				a //modbyshowtempfreq
-			}
-		}' $plibjs
-		
-		$dmode && sed -n "/\/nodes\/localhost\/subscription/,+10p" $plibjs
-	else 
-		echo 找不到修改点，放弃修改这个
-	fi
+
+	# PVE9/PVE8 通用 subscription patch
+	sed -i "/checked_command: function (orig_cmd)/,/},/{
+		/orig_cmd();/i\\
+			return orig_cmd();
+	}" $plibjs
+
+	echo "//modbyshowtempfreq" >> $plibjs
+
 else
 	echo 已经修改过
 fi
