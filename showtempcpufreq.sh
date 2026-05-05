@@ -530,9 +530,10 @@ echo 开始修改pvemanagerlib.js文件
 if ! grep -q 'modbyshowtempfreq' $pvejs ;then
 	[ ! -e $pvejs.$pvever.bak ]  && cp $pvejs $pvejs.$pvever.bak
 	
-	# --- 新增：强制修改“套接字”为“插槽” ---
-	sed -i 's/Sockets/插槽/g' $pvejs
-	# ------------------------------------
+	# 核心修改：定位到 CPU 显示行，将 gettext('Sockets') 强制改为 '插槽'
+	sed -i "s/gettext('Sockets')/'插槽'/g" $pvejs
+	# 顺便处理可能存在的复数形式（针对双路服务器）
+	sed -i "s/gettext('Socket')/'插槽'/g" $pvejs
 	
 	if [ "$(sed -n '/pveversion/,+3{
 			/},/{=;p;q}
