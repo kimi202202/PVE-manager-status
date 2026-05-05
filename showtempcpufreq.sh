@@ -629,19 +629,20 @@ if [ -f "$pvelang" ]; then
 fi
 echo 开始修改proxmoxlib.js文件
 echo 去除订阅弹窗
-
 if ! grep -q 'modbyshowtempfreq' $plibjs ;then
-
 	[ ! -e $plibjs.$pvever.bak ] && cp $plibjs $plibjs.$pvever.bak
 
-	# PVE9/PVE8 通用 subscription patch
-	sed -i "/checked_command: function (orig_cmd)/,/},/{
-		/orig_cmd();/i\\
-			return orig_cmd();
-	}" $plibjs
+	# PVE8/PVE9 通用 patch
+	if grep -q "checked_command: function (orig_cmd)" $plibjs; then
+		sed -i "/checked_command: function (orig_cmd)/,/assemble_field_data/{
+			s/res.data.status.toLowerCase() !== 'active'/false/g
+		}" $plibjs
 
-	echo "//modbyshowtempfreq" >> $plibjs
-
+		echo "//modbyshowtempfreq" >> $plibjs
+		echo 已移除订阅弹窗
+	else
+		echo 找不到 subscription 修改点
+	fi
 else
 	echo 已经修改过
 fi
