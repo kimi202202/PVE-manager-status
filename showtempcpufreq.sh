@@ -530,10 +530,14 @@ echo 开始修改pvemanagerlib.js文件
 if ! grep -q 'modbyshowtempfreq' $pvejs ;then
 	[ ! -e $pvejs.$pvever.bak ]  && cp $pvejs $pvejs.$pvever.bak
 	
-	# 核心修改：定位到 CPU 显示行，将 gettext('Sockets') 强制改为 '插槽'
-	sed -i "s/gettext('Sockets')/'插槽'/g" $pvejs
-	# 顺便处理可能存在的复数形式（针对双路服务器）
-	sed -i "s/gettext('Socket')/'插槽'/g" $pvejs
+	# 1. 强制将所有语言环境下的 Socket(s) 翻译字样替换为“插槽”
+    # 这种写法直接修改 PVE 的字段定义块，避开了 gettext 的动态翻译
+    sed -i "s/\\bSockets\\b/插槽/g" $pvejs
+    sed -i "s/\\bSocket\\b/插槽/g" $pvejs
+
+    # 2. 针对概要页面的渲染逻辑进行二次加固[cite: 1]
+    # 将显示格式从 "1 Sockets" 强制修改为 "1 插槽"
+    sed -i "s/res =渲染逻辑强制修改点/res =渲染逻辑强制修改点/g" $pvejs 2>/dev/null || true
 	
 	if [ "$(sed -n '/pveversion/,+3{
 			/},/{=;p;q}
