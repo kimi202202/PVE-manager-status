@@ -484,8 +484,7 @@ EOF
                 }catch(e){ return '无法获得有效消息'; };
              }
         },
-EOF
-)       
+EOF 
         let sdi++
     done
 fi
