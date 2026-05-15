@@ -426,29 +426,27 @@ if $sODisksInfo;then
         # 1. 确定类型并分配显示名称
         if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
             hddisk=false
-            sdtype="外部USB存储$usbi"
-            is_usb=true
+            sdtype="外部USB存储${usbi}"
             let usbi++
         elif [ "$(cat $sdcr)" = "0" ]; then
             hddisk=false
             sdtype="SATA硬盘${hdi}(SSD)"
-            is_usb=false
             let hdi++
         else
             hddisk=true
             sdtype="SATA硬盘${hdi}(HDD)"
-            is_usb=false
             let hdi++
         fi
         
-        # 2. 写入 Nodes.pm 的数据获取逻辑 (保持顺序)
+        # 2. 写入 Nodes.pm 的数据获取逻辑
         cat >> $contentfornp << EOF
     \$res->{sd$sdi} = \`
         if [ -b $sd ];then
             if $hddisk && hdparm -C $sd 2>/dev/null | grep -iq 'standby';then
                 echo '{"standby": true}'
             else
-                smartctl $sd -a -j || echo '{"model_name": "Read Error"}'
+                # 关键修复：将 sdtype 存入 JSON，防止前端 title 错位
+                smartctl $sd -a -j | jq ".custom_type = \"$sdtype\"" 2>/dev/null || smartctl $sd -a -j || echo '{"model_name": "Read Error"}'
             fi
         else
             echo '{}'
@@ -462,12 +460,11 @@ EOF
               itemId: 'sd${sdi}0',
               colspan: 2,
               printBar: false,
-              title: gettext('${sdtype}'),
+              title: gettext('${sdtype}'), // 这里依然保留 title，但主要靠后端对应的 sdi 索引同步
               textField: 'sd${sdi}',
               renderer:function(value){
                 try{
                     let v = JSON.parse(value);
-                    if (v.standby === true && !v.model_name) return null; 
                     if (v.standby === true) return '休眠中';
                     let model = v.model_name;
                     if (!model) return '找不到硬盘，直通或已被卸载';
