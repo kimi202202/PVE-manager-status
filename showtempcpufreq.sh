@@ -409,50 +409,26 @@ fi
 echo "已添加 $nvi 块NVME硬盘"
 
 #检测机械硬盘
-echo 检测系统中的SATA固态和机械硬盘
-sdi=0    # 内部索引，用于跟后端通讯
-hdi=0    # SATA硬盘显示的序号
-usbi=0   # USB存储显示的序号
+echo "正在重新整理硬盘显示顺序：SATA在前，USB在后..."
+sdi=0    # 统一索引，确保前后端对应
+hdi=0    # SATA显示序号
+usbi=0   # USB显示序号
 
-# 创建临时缓冲区用于分类存储 JS 代码
-js_sata_buffer=""
-js_usb_buffer=""
+# 定义一个处理函数，减少重复代码
+generate_disk_config() {
+    local dev_path=$1
+    local is_usb=$2
+    local hddisk=$3
+    local sdtype=$4
 
-if $sODisksInfo;then
-    for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
-        chmod +s /usr/sbin/smartctl
-        chmod +s /usr/sbin/hdparm
-        
-        sdsn=$(awk -F '/' '{print $NF}' <<< $sd)
-        sdcr=/sys/block/$sdsn/queue/rotational
-        [ -f $sdcr ] || continue
-                
-        # 1. 确定类型并分配显示名称
-        if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
-            hddisk=false
-            sdtype="外部USB存储$usbi"
-            is_usb_true=true
-            let usbi++
-        elif [ "$(cat $sdcr)" = "0" ]; then
-            hddisk=false
-            sdtype="SATA硬盘${hdi}(SSD)"
-            is_usb_true=false
-            let hdi++
-        else
-            hddisk=true
-            sdtype="SATA硬盘${hdi}(HDD)"
-            is_usb_true=false
-            let hdi++
-        fi
-        
-        # 2. 写入 Nodes.pm 的数据获取逻辑 (后端逻辑可以保持顺序，sdi作为唯一索引)
-        cat >> $contentfornp << EOF
+    # 1. 写入 Nodes.pm 后端取数逻辑
+    cat >> $contentfornp << EOF
     \$res->{sd$sdi} = \`
-        if [ -b $sd ];then
-            if $hddisk && hdparm -C $sd 2>/dev/null | grep -iq 'standby';then
+        if [ -b $dev_path ];then
+            if $hddisk && hdparm -C $dev_path 2>/dev/null | grep -iq 'standby';then
                 echo '{"standby": true}'
             else
-                smartctl $sd -a -j || echo '{"model_name": "Read Error"}'
+                smartctl $dev_path -a -j || echo '{"model_name": "Read Error"}'
             fi
         else
             echo '{}'
@@ -460,51 +436,65 @@ if $sODisksInfo;then
     \`;
 EOF
 
-        # 3. 构造 JS 渲染逻辑块并根据类型放入不同缓冲区
-        current_js_block=$(cat << EOF
-        {
-              itemId: 'sd${sdi}0',
-              colspan: 2,
-              printBar: false,
-              title: gettext('${sdtype}'),
-              textField: 'sd${sdi}',
-              renderer:function(value){
-                try{
-                    let v = JSON.parse(value);
-                    if (v.standby === true && !v.model_name) return '休眠中';
-                    if (v.standby === true) return '休眠中';
-                    let model = v.model_name;
-                    if (!model) return '找不到硬盘，直通或已被卸载';
-                    let snRaw = v.serial_number;
-                    let sn = snRaw ? " | SN: "+ snRaw : '';
-                    let temp = v.temperature?.current;
-                    temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
-                    let pot = v.power_on_time?.hours;
-                    let poth = v.power_cycle_count;
-                    pot = ( pot !== undefined ) ? (" | 通电: " + pot + '时' + ( poth ? ',次: '+ poth : '' )) : '';
-                    let smart = v.smart_status?.passed;
-                    smart = (smart === undefined ) ? '' : ' | SMART: ' + (smart ? '正常' : '警告!');
-                    return model + sn + temp + pot + smart;
-                }catch(e){ return '无法获得有效消息'; };
-             }
-        },
+    # 2. 写入 pvemanagerlib.js 前端渲染逻辑
+    cat >> $contentforpvejs << EOF
+    {
+          itemId: 'sd${sdi}0',
+          colspan: 2,
+          printBar: false,
+          title: gettext('${sdtype}'),
+          textField: 'sd${sdi}',
+          renderer:function(value){
+            try{
+                let v = JSON.parse(value);
+                if (v.standby === true) return '休眠中';
+                let model = v.model_name;
+                if (!model) return '找不到硬盘，直通或已被卸载';
+                let snRaw = v.serial_number;
+                let sn = snRaw ? " | SN: "+ snRaw : '';
+                let temp = v.temperature?.current;
+                temp = ( temp !== undefined ) ? " | 温度: " + temp + '°C' : '' ;
+                let pot = v.power_on_time?.hours;
+                let poth = v.power_cycle_count;
+                pot = ( pot !== undefined ) ? (" | 通电: " + pot + '时' + ( poth ? ',次: '+ poth : '' )) : '';
+                let smart = v.smart_status?.passed;
+                smart = (smart === undefined ) ? '' : ' | SMART: ' + (smart ? '正常' : '警告!');
+                return model + sn + temp + pot + smart;
+            }catch(e){ return '无法获得有效消息'; };
+         }
+    },
 EOF
-)
-        # 将 JS 片段追加到对应缓冲区
-        if [ "$is_usb_true" = true ]; then
-            js_usb_buffer+="$current_js_block"
-        else
-            js_sata_buffer+="$current_js_block"
-        fi
+    let sdi++
+}
 
-        let sdi++
+if $sODisksInfo; then
+    # 第一遍扫描：只处理非 USB 的 SATA 硬盘
+    for sd in $(ls /dev/sd[a-z] 2> /dev/null); do
+        sdsn=$(basename $sd)
+        [ -f /sys/block/$sdsn/queue/rotational ] || continue
+        
+        if [[ "$(readlink -f /sys/class/block/$sdsn)" != *"usb"* ]]; then
+            if [ "$(cat /sys/block/$sdsn/queue/rotational)" = "0" ]; then
+                generate_disk_config "$sd" false false "SATA硬盘${hdi}(SSD)"
+            else
+                generate_disk_config "$sd" false true "SATA硬盘${hdi}(HDD)"
+            fi
+            let hdi++
+        fi
     done
-    
-    # 将排序后的 JS 内容写入文件：先 SATA 后 USB
-    echo "$js_sata_buffer" >> $contentforpvejs
-    echo "$js_usb_buffer" >> $contentforpvejs
+
+    # 第二遍扫描：只处理 USB 存储
+    for sd in $(ls /dev/sd[a-z] 2> /dev/null); do
+        sdsn=$(basename $sd)
+        [ -f /sys/block/$sdsn/queue/rotational ] || continue
+        
+        if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
+            generate_disk_config "$sd" true false "外部USB存储$usbi"
+            let usbi++
+        fi
+    done
 fi
-echo "已添加 $sdi 块硬盘 (SATA: $hdi, USB: $usbi)"
+echo "已完成排序：添加了 $hdi 块SATA硬盘和 $usbi 块USB设备。"
 
 echo 开始修改nodes.pm文件
 if ! grep -q 'modbyshowtempfreq' $np ;then
