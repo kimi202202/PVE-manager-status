@@ -414,6 +414,10 @@ sdi=0    # 内部索引，用于跟后端通讯
 hdi=0    # SATA硬盘显示的序号
 usbi=0   # USB存储显示的序号
 
+# 创建临时缓冲区用于分类存储 JS 代码
+js_sata_buffer=""
+js_usb_buffer=""
+
 if $sODisksInfo;then
     for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
         chmod +s /usr/sbin/smartctl
@@ -427,21 +431,21 @@ if $sODisksInfo;then
         if [[ "$(readlink -f /sys/class/block/$sdsn)" == *"usb"* ]]; then
             hddisk=false
             sdtype="外部USB存储$usbi"
-            is_usb=true
+            is_usb_true=true
             let usbi++
         elif [ "$(cat $sdcr)" = "0" ]; then
             hddisk=false
             sdtype="SATA硬盘${hdi}(SSD)"
-            is_usb=false
+            is_usb_true=false
             let hdi++
         else
             hddisk=true
             sdtype="SATA硬盘${hdi}(HDD)"
-            is_usb=false
+            is_usb_true=false
             let hdi++
         fi
         
-        # 2. 写入 Nodes.pm 的数据获取逻辑 (保持顺序)
+        # 2. 写入 Nodes.pm 的数据获取逻辑 (后端逻辑可以保持顺序，sdi作为唯一索引)
         cat >> $contentfornp << EOF
     \$res->{sd$sdi} = \`
         if [ -b $sd ];then
@@ -456,8 +460,8 @@ if $sODisksInfo;then
     \`;
 EOF
 
-        # 3. 构造 JS 渲染逻辑块
-        cat >> $contentforpvejs << EOF
+        # 3. 构造 JS 渲染逻辑块并根据类型放入不同缓冲区
+        current_js_block=$(cat << EOF
         {
               itemId: 'sd${sdi}0',
               colspan: 2,
@@ -485,11 +489,22 @@ EOF
              }
         },
 EOF
+)
+        # 将 JS 片段追加到对应缓冲区
+        if [ "$is_usb_true" = true ]; then
+            js_usb_buffer+="$current_js_block"
+        else
+            js_sata_buffer+="$current_js_block"
+        fi
+
         let sdi++
     done
+    
+    # 将排序后的 JS 内容写入文件：先 SATA 后 USB
+    echo "$js_sata_buffer" >> $contentforpvejs
+    echo "$js_usb_buffer" >> $contentforpvejs
 fi
 echo "已添加 $sdi 块硬盘 (SATA: $hdi, USB: $usbi)"
-
 
 echo 开始修改nodes.pm文件
 if ! grep -q 'modbyshowtempfreq' $np ;then
