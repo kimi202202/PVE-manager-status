@@ -414,10 +414,6 @@ sdi=0    # 内部索引，用于跟后端通讯
 hdi=0    # SATA硬盘显示的序号
 usbi=0   # USB存储显示的序号
 
-# 临时存储生成的 JS 代码块，以便排序
-js_sata_blocks=""
-js_usb_blocks=""
-
 if $sODisksInfo;then
     for sd in $(ls /dev/sd[a-z] 2> /dev/null);do
         chmod +s /usr/sbin/smartctl
@@ -461,7 +457,7 @@ if $sODisksInfo;then
 EOF
 
         # 3. 构造 JS 渲染逻辑块
-        current_js_block=$(cat << EOF
+        cat >> $contentforpvejs << EOF
         {
               itemId: 'sd${sdi}0',
               colspan: 2,
@@ -489,20 +485,10 @@ EOF
              }
         },
 EOF
-)
-        # 根据类型归类
-        if [ "$is_usb" = true ]; then
-            js_usb_blocks+="$current_js_block"
-        else
-            js_sata_blocks+="$current_js_block"
-        fi
+)       
         let sdi++
     done
 fi
-
-# 按照 SATA -> USB 的顺序写入文件
-echo "$js_sata_blocks" >> $contentforpvejs
-echo "$js_usb_blocks" >> $contentforpvejs
 
 echo "已添加 $sdi 块硬盘 (SATA: $hdi, USB: $usbi)"
 
