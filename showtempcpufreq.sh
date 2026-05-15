@@ -467,7 +467,7 @@ EOF
               renderer:function(value){
                 try{
                     let v = JSON.parse(value);
-                    if (v.standby === true && !v.model_name) return null; 
+                    if (v.standby === true && !v.model_name) return '休眠中';
                     if (v.standby === true) return '休眠中';
                     let model = v.model_name;
                     if (!model) return '找不到硬盘，直通或已被卸载';
